@@ -101,13 +101,16 @@ export function useAudioEngine() {
     if (gain) {
       gain.gain.setTargetAtTime(0, now, FADE_DURATION / 3);
     }
+    const leftOsc = leftOscRef.current;
+    const rightOsc = rightOscRef.current;
+    const noiseSource = noiseSourceRef.current;
+    leftOscRef.current = null;
+    rightOscRef.current = null;
+    noiseSourceRef.current = null;
     setTimeout(() => {
-      leftOscRef.current?.stop();
-      rightOscRef.current?.stop();
-      noiseSourceRef.current?.stop();
-      leftOscRef.current = null;
-      rightOscRef.current = null;
-      noiseSourceRef.current = null;
+      try { leftOsc?.stop(); } catch {}
+      try { rightOsc?.stop(); } catch {}
+      try { noiseSource?.stop(); } catch {}
     }, FADE_DURATION * 1000);
   }, []);
 
