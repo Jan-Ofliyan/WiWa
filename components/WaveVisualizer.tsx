@@ -12,6 +12,7 @@ const MODE_COLORS: Record<Mode, { primary: string; secondary: string }> = {
   meditation: { primary: "#5BA3F5", secondary: "#A8D4FF" },
   sleep:      { primary: "#A8D4FF", secondary: "#7fb3e8" },
   silence:    { primary: "#7fb3e8", secondary: "#378ADD" },
+  gamma:      { primary: "#B8E0FF", secondary: "#DAEEFF" },
 };
 
 const BAR_COUNT = 32;

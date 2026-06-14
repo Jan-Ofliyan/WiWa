@@ -225,10 +225,18 @@ export default function Player() {
         </button>
       </div>
 
-      {/* Mode description */}
-      <p className="text-xs text-center" style={{ color: "#3d6b9e" }}>
-        {audio.modeConfig.label} — {audio.modeConfig.description}
-      </p>
+      {/* Mode description card */}
+      <div
+        className="w-full rounded-2xl px-4 py-4 transition-all duration-500"
+        style={{ backgroundColor: "#0d1f3c", border: "1px solid #1a3a6b" }}
+      >
+        <p className="text-xs font-semibold tracking-wider uppercase mb-1" style={{ color: "#378ADD" }}>
+          {audio.modeConfig.feeling}
+        </p>
+        <p className="text-xs leading-relaxed" style={{ color: "#7fb3e8" }}>
+          {audio.modeConfig.effect}
+        </p>
+      </div>
     </div>
   );
 }

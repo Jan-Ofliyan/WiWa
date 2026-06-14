@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from "react";
 
-export type Mode = "focus" | "meditation" | "sleep" | "silence";
+export type Mode = "focus" | "meditation" | "sleep" | "silence" | "gamma";
 export type Intensity = "light" | "medium" | "deep";
 
 interface ModeConfig {
@@ -11,6 +11,8 @@ interface ModeConfig {
   noiseGain: number;
   label: string;
   description: string;
+  feeling: string;
+  effect: string;
 }
 
 const MODE_CONFIGS: Record<Mode, ModeConfig> = {
@@ -19,28 +21,45 @@ const MODE_CONFIGS: Record<Mode, ModeConfig> = {
     carrierFreq: 200,
     noiseGain: 0.04,
     label: "Фокус",
-    description: "Бета-волны 14–18 Гц",
+    description: "Бета-волны · 14–18 Гц",
+    feeling: "Ясность и концентрация",
+    effect: "Мозг входит в рабочий поток. Мысли чёткие, внимание устойчивое, задачи решаются легче.",
   },
   meditation: {
     beatFreq: 10,
     carrierFreq: 180,
     noiseGain: 0.03,
     label: "Медитация",
-    description: "Альфа-волны 8–12 Гц",
+    description: "Альфа-волны · 8–12 Гц",
+    feeling: "Спокойствие без сонливости",
+    effect: "Снятие стресса, лёгкость в теле. Мозг расслаблен, но осознан — идеально для медитации.",
   },
   sleep: {
     beatFreq: 2,
     carrierFreq: 150,
     noiseGain: 0.06,
     label: "Сон",
-    description: "Дельта-волны 1–4 Гц",
+    description: "Дельта-волны · 1–4 Гц",
+    feeling: "Глубокое погружение",
+    effect: "Физическое восстановление, укрепление иммунитета, очищение мозга от токсинов через глимфатическую систему.",
   },
   silence: {
     beatFreq: 6,
     carrierFreq: 160,
     noiseGain: 0.01,
     label: "Тишина",
-    description: "Тета-волны 4–8 Гц",
+    description: "Тета-волны · 4–8 Гц",
+    feeling: "Ворота в подсознание",
+    effect: "Творчество, озарения, интуиция. Консолидация памяти. Граница между сном и бодрствованием.",
+  },
+  gamma: {
+    beatFreq: 40,
+    carrierFreq: 200,
+    noiseGain: 0.02,
+    label: "Гамма",
+    description: "Гамма-волны · 40 Гц",
+    feeling: "Пиковая осознанность",
+    effect: "Максимальная когерентность мозга. Осознанное присутствие, интеграция информации, состояние потока.",
   },
 };
 
