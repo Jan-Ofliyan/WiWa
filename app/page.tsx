@@ -13,10 +13,10 @@ export default function Home() {
           className="text-4xl font-bold tracking-widest mb-2"
           style={{ color: "#e8f4ff" }}
         >
-          THE WAVES
+          WiWa
         </h1>
         <p className="text-sm tracking-wider uppercase mb-8" style={{ color: "#3d6b9e" }}>
-          нейромузыка для мозга
+          Wisdom Waves
         </p>
         <Link
           href="/app"

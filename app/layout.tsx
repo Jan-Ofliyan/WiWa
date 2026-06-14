@@ -8,8 +8,8 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "The Waves — нейромузыка для мозга",
-  description: "Бинауральные биения для фокуса, медитации и сна",
+  title: "WiWa — Wisdom Waves",
+  description: "Нейромузыка для мозга — бинауральные биения для фокуса, медитации и сна",
 };
 
 export default function RootLayout({

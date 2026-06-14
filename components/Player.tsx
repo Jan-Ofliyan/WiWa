@@ -46,7 +46,7 @@ export default function Player() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-widest" style={{ color: "#e8f4ff" }}>
-          THE WAVES
+          WiWa
         </h1>
         <p className="text-xs mt-1 tracking-wider uppercase" style={{ color: "#3d6b9e" }}>
           нейромузыка
