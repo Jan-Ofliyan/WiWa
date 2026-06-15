@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "TildaSans";
+  src: url("/fonts/TildaSans.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-primary: #050a14;
   --bg-secondary: #0a1628;
@@ -16,7 +24,7 @@
 @theme inline {
   --color-background: var(--bg-primary);
   --color-foreground: var(--text-primary);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: "TildaSans", Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -32,7 +40,7 @@ html, body {
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "TildaSans", Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -60,6 +68,16 @@ body {
 @keyframes rotate-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes wave-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Wave scroll animation — speed set via --wave-speed CSS variable */
+.wave-animate {
+  animation: wave-scroll var(--wave-speed, 5s) linear infinite;
 }
 
 .animate-fade-in {

@@ -7,55 +7,62 @@ export type Intensity = "light" | "medium" | "deep";
 
 interface ModeConfig {
   beatFreq: number;
-  carrierFreq: number;
+  carrierFreq: number; // solfeggio frequency
   noiseGain: number;
+  breathPeriod: number; // seconds per breath cycle
   label: string;
   description: string;
   feeling: string;
   effect: string;
 }
 
+// Solfeggio carrier frequencies replace the generic 150-200 Hz
 const MODE_CONFIGS: Record<Mode, ModeConfig> = {
   focus: {
     beatFreq: 16,
-    carrierFreq: 200,
+    carrierFreq: 396,   // Ut — освобождение, ясность
     noiseGain: 0.04,
+    breathPeriod: 4,
     label: "Фокус",
-    description: "Бета-волны · 14–18 Гц",
+    description: "Бета-волны · 16 Гц",
     feeling: "Ясность и концентрация",
     effect: "Мозг входит в рабочий поток. Мысли чёткие, внимание устойчивое, задачи решаются легче.",
   },
   meditation: {
     beatFreq: 10,
-    carrierFreq: 180,
+    carrierFreq: 528,   // Mi — трансформация, восстановление
     noiseGain: 0.03,
+    breathPeriod: 6,
     label: "Медитация",
-    description: "Альфа-волны · 8–12 Гц",
+    description: "Альфа-волны · 10 Гц",
     feeling: "Спокойствие без сонливости",
     effect: "Снятие стресса, лёгкость в теле. Мозг расслаблен, но осознан — идеально для медитации.",
   },
   sleep: {
     beatFreq: 2,
-    carrierFreq: 150,
+    carrierFreq: 174,   // глубокое расслабление, снятие боли
     noiseGain: 0.06,
+    breathPeriod: 8,
     label: "Сон",
-    description: "Дельта-волны · 1–4 Гц",
+    description: "Дельта-волны · 2 Гц",
     feeling: "Глубокое погружение",
     effect: "Физическое восстановление, укрепление иммунитета, очищение мозга от токсинов через глимфатическую систему.",
   },
   silence: {
     beatFreq: 6,
-    carrierFreq: 160,
+    carrierFreq: 285,   // регенерация, интуиция
     noiseGain: 0.01,
+    breathPeriod: 6,
     label: "Тишина",
-    description: "Тета-волны · 4–8 Гц",
+    description: "Тета-волны · 6 Гц",
     feeling: "Ворота в подсознание",
     effect: "Творчество, озарения, интуиция. Консолидация памяти. Граница между сном и бодрствованием.",
   },
   gamma: {
     beatFreq: 40,
-    carrierFreq: 200,
+    carrierFreq: 963,   // пиковое сознание, пинеальная активация
     noiseGain: 0.02,
+    breathPeriod: 4,
     label: "Гамма",
     description: "Гамма-волны · 40 Гц",
     feeling: "Пиковая осознанность",
@@ -69,7 +76,7 @@ const INTENSITY_GAIN: Record<Intensity, number> = {
   deep: 1.0,
 };
 
-const FADE_DURATION = 3;
+const FADE_DURATION = 0.4;
 
 function createPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
   const bufferSize = ctx.sampleRate * 2;
@@ -91,26 +98,30 @@ function createPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
 }
 
 export function useAudioEngine() {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null);
-  const leftOscRef = useRef<OscillatorNode | null>(null);
-  const rightOscRef = useRef<OscillatorNode | null>(null);
-  const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const noiseGainRef = useRef<GainNode | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ctxRef          = useRef<AudioContext | null>(null);
+  const masterGainRef   = useRef<GainNode | null>(null);
+  const leftOscRef      = useRef<OscillatorNode | null>(null);
+  const rightOscRef     = useRef<OscillatorNode | null>(null);
+  const noiseSourceRef  = useRef<AudioBufferSourceNode | null>(null);
+  const noiseGainRef    = useRef<GainNode | null>(null);
+  // isochronic
+  const isoOscRef       = useRef<OscillatorNode | null>(null);
+  const isoLfoRef       = useRef<OscillatorNode | null>(null);
+  const isoConstRef     = useRef<ConstantSourceNode | null>(null);
+  // breathing
+  const breathLfoRef    = useRef<OscillatorNode | null>(null);
+  const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [mode, setModeState] = useState<Mode>("focus");
-  const [intensity, setIntensityState] = useState<Intensity>("medium");
-  const [volume, setVolumeState] = useState(0.8);
-  const [elapsed, setElapsed] = useState(0);
-  const [duration, setDurationState] = useState(25);
+  const [isPlaying, setIsPlaying]       = useState(false);
+  const [mode, setModeState]            = useState<Mode>("focus");
+  const [intensity, setIntensityState]  = useState<Intensity>("medium");
+  const [volume, setVolumeState]        = useState(0.8);
+  const [elapsed, setElapsed]           = useState(0);
+  const [duration, setDurationState]    = useState(25);
   const startTimeRef = useRef<number>(0);
 
   const getCtx = useCallback(() => {
-    if (!ctxRef.current) {
-      ctxRef.current = new AudioContext();
-    }
+    if (!ctxRef.current) ctxRef.current = new AudioContext();
     return ctxRef.current;
   }, []);
 
@@ -118,18 +129,31 @@ export function useAudioEngine() {
     const now = ctxRef.current?.currentTime ?? 0;
     const gain = masterGainRef.current;
     if (gain) {
+      gain.gain.cancelScheduledValues(now);
       gain.gain.setTargetAtTime(0, now, FADE_DURATION / 3);
     }
-    const leftOsc = leftOscRef.current;
-    const rightOsc = rightOscRef.current;
-    const noiseSource = noiseSourceRef.current;
-    leftOscRef.current = null;
-    rightOscRef.current = null;
+
+    // Capture current node values before nulling refs
+    const toStop = [
+      leftOscRef.current,
+      rightOscRef.current,
+      isoOscRef.current,
+      isoLfoRef.current,
+      breathLfoRef.current,
+      noiseSourceRef.current,
+      isoConstRef.current,
+    ];
+
+    leftOscRef.current     = null;
+    rightOscRef.current    = null;
+    isoOscRef.current      = null;
+    isoLfoRef.current      = null;
+    breathLfoRef.current   = null;
     noiseSourceRef.current = null;
+    isoConstRef.current    = null;
+
     setTimeout(() => {
-      try { leftOsc?.stop(); } catch {}
-      try { rightOsc?.stop(); } catch {}
-      try { noiseSource?.stop(); } catch {}
+      toStop.forEach(n => { try { (n as AudioScheduledSourceNode)?.stop(); } catch {} });
     }, FADE_DURATION * 1000);
   }, []);
 
@@ -137,21 +161,35 @@ export function useAudioEngine() {
     const ctx = getCtx();
     if (ctx.state === "suspended") ctx.resume();
 
-    const activeMode = targetMode ?? mode;
+    const activeMode      = targetMode      ?? mode;
     const activeIntensity = targetIntensity ?? intensity;
-    const activeDuration = targetDuration ?? duration;
-    const config = MODE_CONFIGS[activeMode];
-    const intensityGain = INTENSITY_GAIN[activeIntensity];
+    const activeDuration  = targetDuration  ?? duration;
+    const config          = MODE_CONFIGS[activeMode];
+    const targetVol       = volume * INTENSITY_GAIN[activeIntensity];
 
     stopNodes();
 
+    // ─── Master gain (fade in) ───────────────────────────────────────
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(0, ctx.currentTime);
-    masterGain.gain.linearRampToValueAtTime(volume * intensityGain, ctx.currentTime + FADE_DURATION);
+    masterGain.gain.linearRampToValueAtTime(targetVol, ctx.currentTime + FADE_DURATION);
     masterGain.connect(ctx.destination);
     masterGainRef.current = masterGain;
 
-    // Left channel — carrier
+    // ─── Breathing rhythm ────────────────────────────────────────────
+    // Sine LFO at 1/breathPeriod Hz → ±8% volume sway
+    // Body naturally syncs breathing to the rhythm
+    const breathLfo = ctx.createOscillator();
+    breathLfo.type = "sine";
+    breathLfo.frequency.value = 1 / config.breathPeriod;
+    const breathDepth = ctx.createGain();
+    breathDepth.gain.value = targetVol * 0.08;
+    breathLfo.connect(breathDepth);
+    breathDepth.connect(masterGain.gain);
+    breathLfo.start();
+    breathLfoRef.current = breathLfo;
+
+    // ─── Binaural beats (headphones) ─────────────────────────────────
     const merger = ctx.createChannelMerger(2);
     merger.connect(masterGain);
 
@@ -159,24 +197,60 @@ export function useAudioEngine() {
     leftOsc.frequency.value = config.carrierFreq;
     leftOsc.type = "sine";
     const leftGain = ctx.createGain();
-    leftGain.gain.value = 0.5;
+    leftGain.gain.value = 0.4;
     leftOsc.connect(leftGain);
     leftGain.connect(merger, 0, 0);
     leftOsc.start();
     leftOscRef.current = leftOsc;
 
-    // Right channel — carrier + beat
     const rightOsc = ctx.createOscillator();
     rightOsc.frequency.value = config.carrierFreq + config.beatFreq;
     rightOsc.type = "sine";
     const rightGain = ctx.createGain();
-    rightGain.gain.value = 0.5;
+    rightGain.gain.value = 0.4;
     rightOsc.connect(rightGain);
     rightGain.connect(merger, 0, 1);
     rightOsc.start();
     rightOscRef.current = rightOsc;
 
-    // Pink noise
+    // ─── Isochronic tones (works without headphones) ─────────────────
+    // Carrier at solfeggio freq, amplitude gated by square LFO at beat freq
+    // Gate: ConstantSource(0.4) + LFO*0.4 → [0 .. 0.8] (off → on)
+    const isoOsc = ctx.createOscillator();
+    isoOsc.type = "sine";
+    isoOsc.frequency.value = config.carrierFreq;
+
+    const pulseGate = ctx.createGain();
+    pulseGate.gain.value = 0; // controlled by LFO + const below
+
+    const isoLfo = ctx.createOscillator();
+    isoLfo.type = "square";
+    isoLfo.frequency.value = config.beatFreq;
+
+    const isoLfoScale = ctx.createGain();
+    isoLfoScale.gain.value = 0.4; // [-1,1] → [-0.4, 0.4]
+
+    const isoConst = new ConstantSourceNode(ctx, { offset: 0.4 }); // shift → [0, 0.8]
+
+    isoLfo.connect(isoLfoScale);
+    isoLfoScale.connect(pulseGate.gain);
+    isoConst.connect(pulseGate.gain);
+
+    const isoVol = ctx.createGain();
+    isoVol.gain.value = 0.28; // quieter than binaural, blends in
+
+    isoOsc.connect(pulseGate);
+    pulseGate.connect(isoVol);
+    isoVol.connect(masterGain);
+
+    isoLfo.start();
+    isoConst.start();
+    isoOsc.start();
+    isoOscRef.current  = isoOsc;
+    isoLfoRef.current  = isoLfo;
+    isoConstRef.current = isoConst;
+
+    // ─── Pink noise ──────────────────────────────────────────────────
     const noiseBuffer = createPinkNoiseBuffer(ctx);
     const noiseSource = ctx.createBufferSource();
     noiseSource.buffer = noiseBuffer;
@@ -187,7 +261,7 @@ export function useAudioEngine() {
     noiseGain.connect(masterGain);
     noiseSource.start();
     noiseSourceRef.current = noiseSource;
-    noiseGainRef.current = noiseGain;
+    noiseGainRef.current   = noiseGain;
 
     startTimeRef.current = Date.now();
     setElapsed(0);
@@ -197,9 +271,7 @@ export function useAudioEngine() {
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsed(secs);
-      if (secs >= activeDuration * 60) {
-        stop();
-      }
+      if (secs >= activeDuration * 60) stop();
     }, 1000);
   }, [mode, intensity, duration, volume, getCtx, stopNodes]);
 
@@ -229,9 +301,7 @@ export function useAudioEngine() {
 
   const setMode = useCallback((m: Mode) => {
     setModeState(m);
-    if (isPlaying) {
-      stop();
-    }
+    if (isPlaying) stop();
   }, [isPlaying, stop]);
 
   const setIntensity = useCallback((i: Intensity) => {

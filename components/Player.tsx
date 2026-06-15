@@ -176,52 +176,27 @@ export default function Player() {
         />
       </div>
 
-      {/* Play controls */}
-      <div className="flex items-center gap-4 w-full justify-center mt-2">
-        {/* Stop */}
+      {/* Play / Stop */}
+      <div className="flex items-center justify-center mt-2">
         <button
-          onClick={handleStop}
-          disabled={!audio.isPlaying && audio.elapsed === 0}
-          className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-30"
-          style={{ backgroundColor: "#0d1f3c", border: "1px solid #1a3a6b", color: "#3d6b9e" }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            <rect width="14" height="14" rx="2" />
-          </svg>
-        </button>
-
-        {/* Play / Pause */}
-        <button
-          onClick={handlePlay}
+          onClick={audio.isPlaying ? handleStop : handlePlay}
           className="w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 active:scale-95"
           style={{
-            background: audio.isPlaying
-              ? "linear-gradient(135deg, #378ADD, #5BA3F5)"
-              : "linear-gradient(135deg, #378ADD, #5BA3F5)",
+            background: "linear-gradient(135deg, #378ADD, #5BA3F5)",
             boxShadow: audio.isPlaying
               ? "0 0 30px #378ADD55, 0 0 60px #378ADD22"
               : "0 4px 20px #378ADD44",
           }}
         >
           {audio.isPlaying ? (
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="white">
-              <rect x="3" y="2" width="5" height="16" rx="1.5" />
-              <rect x="12" y="2" width="5" height="16" rx="1.5" />
+            <svg width="20" height="20" viewBox="0 0 14 14" fill="white">
+              <rect width="14" height="14" rx="2" />
             </svg>
           ) : (
             <svg width="22" height="22" viewBox="0 0 22 22" fill="white" style={{ marginLeft: 3 }}>
               <path d="M4 2l16 9-16 9V2z" />
             </svg>
           )}
-        </button>
-
-        {/* Skip +10s */}
-        <button
-          onClick={() => {/* future: skip */}}
-          className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200"
-          style={{ backgroundColor: "#0d1f3c", border: "1px solid #1a3a6b", color: "#3d6b9e" }}
-        >
-          <span className="text-xs font-bold">+10</span>
         </button>
       </div>
 
