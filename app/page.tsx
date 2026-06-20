@@ -9,18 +9,12 @@ export default function Home() {
       }}
     >
       <div className="text-center animate-fade-in flex flex-col items-center gap-2">
-        <h1
-          className="text-5xl font-bold tracking-widest"
-          style={{ color: "#e8f4ff" }}
-        >
-          WiWa
-        </h1>
-        <p
-          className="text-base tracking-widest"
-          style={{ color: "#7fb3e8" }}
-        >
-          Wisdom Waves
-        </p>
+        <img
+          src="/wiwa-logo.svg"
+          alt="WiWa"
+          className="w-64 opacity-90"
+          style={{ filter: "brightness(0) invert(1)", opacity: 0.9 }}
+        />
 
         {/* Автор */}
         <a

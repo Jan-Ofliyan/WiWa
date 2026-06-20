@@ -44,12 +44,18 @@ export default function Player() {
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-sm mx-auto px-4 py-8 animate-fade-in">
       {/* Header */}
-      <div className="text-center">
-        <h1 className="text-2xl font-bold tracking-widest" style={{ color: "#e8f4ff" }}>
-          WiWa
-        </h1>
-        <p className="text-xs mt-1 tracking-wider uppercase" style={{ color: "#3d6b9e" }}>
-          нейромузыка
+      <div className="flex flex-col items-center gap-1">
+        <img
+          src="/wiwa-logo.svg"
+          alt="WiWa"
+          className="w-32"
+          style={{ filter: "brightness(0) invert(1)", opacity: 0.9 }}
+        />
+        <p className="text-sm tracking-widest" style={{ color: "#7fb3e8" }}>
+          Wisdom Waves
+        </p>
+        <p className="text-xs tracking-wider" style={{ color: "#3d6b9e" }}>
+          нейромузыка для твоего мозга
         </p>
       </div>
 
