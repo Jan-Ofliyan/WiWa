@@ -7,22 +7,28 @@ export type Intensity = "light" | "medium" | "deep";
 
 interface ModeConfig {
   beatFreq: number;
-  carrierFreq: number; // solfeggio frequency
+  carrierFreq: number;
   noiseGain: number;
-  breathPeriod: number; // seconds per breath cycle
+  noiseCutoff: number;
+  breathPeriod: number;
+  reverbDecay: number;
+  harmonics: number[];
   label: string;
   description: string;
   feeling: string;
   effect: string;
 }
 
-// Solfeggio carrier frequencies replace the generic 150-200 Hz
+// Solfeggio carrier frequencies + ambient harmonic profiles
 const MODE_CONFIGS: Record<Mode, ModeConfig> = {
   focus: {
     beatFreq: 16,
-    carrierFreq: 396,   // Ut — освобождение, ясность
-    noiseGain: 0.04,
+    carrierFreq: 396,
+    noiseGain: 0.025,
+    noiseCutoff: 1200,
     breathPeriod: 4,
+    reverbDecay: 2.5,
+    harmonics: [1, 1.5, 2],          // root + fifth + octave
     label: "Фокус",
     description: "Бета-волны · 16 Гц",
     feeling: "Ясность и концентрация",
@@ -30,9 +36,12 @@ const MODE_CONFIGS: Record<Mode, ModeConfig> = {
   },
   meditation: {
     beatFreq: 10,
-    carrierFreq: 528,   // Mi — трансформация, восстановление
-    noiseGain: 0.03,
+    carrierFreq: 528,
+    noiseGain: 0.02,
+    noiseCutoff: 600,
     breathPeriod: 6,
+    reverbDecay: 4.5,
+    harmonics: [1, 1.333, 1.5, 2],   // root + fourth + fifth + octave
     label: "Медитация",
     description: "Альфа-волны · 10 Гц",
     feeling: "Спокойствие без сонливости",
@@ -40,29 +49,38 @@ const MODE_CONFIGS: Record<Mode, ModeConfig> = {
   },
   sleep: {
     beatFreq: 2,
-    carrierFreq: 174,   // глубокое расслабление, снятие боли
-    noiseGain: 0.06,
+    carrierFreq: 174,
+    noiseGain: 0.045,
+    noiseCutoff: 250,
     breathPeriod: 8,
+    reverbDecay: 7.0,
+    harmonics: [1, 2, 3],            // root + octave + octave+fifth (deep resonance)
     label: "Сон",
     description: "Дельта-волны · 2 Гц",
     feeling: "Глубокое погружение",
     effect: "Физическое восстановление, укрепление иммунитета, очищение мозга от токсинов через глимфатическую систему.",
   },
   silence: {
-    beatFreq: 6,
-    carrierFreq: 285,   // регенерация, интуиция
-    noiseGain: 0.01,
+    beatFreq: 7.83,
+    carrierFreq: 285,
+    noiseGain: 0.012,
+    noiseCutoff: 400,
     breathPeriod: 6,
+    reverbDecay: 5.5,
+    harmonics: [1, 1.5, 1.778, 2],   // root + fifth + min7 + octave (mysterious)
     label: "Тишина",
-    description: "Тета-волны · 6 Гц",
+    description: "Тета-волны · 7.83 Гц",
     feeling: "Ворота в подсознание",
     effect: "Творчество, озарения, интуиция. Консолидация памяти. Граница между сном и бодрствованием.",
   },
   gamma: {
     beatFreq: 40,
-    carrierFreq: 963,   // пиковое сознание, пинеальная активация
-    noiseGain: 0.02,
+    carrierFreq: 963,
+    noiseGain: 0.012,
+    noiseCutoff: 900,
     breathPeriod: 4,
+    reverbDecay: 3.0,
+    harmonics: [1, 1.5, 2],          // root + fifth + octave (crystalline)
     label: "Гамма",
     description: "Гамма-волны · 40 Гц",
     feeling: "Пиковая осознанность",
@@ -76,7 +94,7 @@ const INTENSITY_GAIN: Record<Intensity, number> = {
   deep: 1.0,
 };
 
-const FADE_DURATION = 0.4;
+const FADE_DURATION = 1.2;
 
 function createPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
   const bufferSize = ctx.sampleRate * 2;
@@ -97,31 +115,53 @@ function createPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
   return buffer;
 }
 
-export function useAudioEngine() {
-  const ctxRef          = useRef<AudioContext | null>(null);
-  const masterGainRef   = useRef<GainNode | null>(null);
-  const leftOscRef      = useRef<OscillatorNode | null>(null);
-  const rightOscRef     = useRef<OscillatorNode | null>(null);
-  const noiseSourceRef  = useRef<AudioBufferSourceNode | null>(null);
-  const noiseGainRef    = useRef<GainNode | null>(null);
-  // isochronic
-  const isoOscRef       = useRef<OscillatorNode | null>(null);
-  const isoLfoRef       = useRef<OscillatorNode | null>(null);
-  const isoConstRef     = useRef<ConstantSourceNode | null>(null);
-  // breathing
-  const breathLfoRef    = useRef<OscillatorNode | null>(null);
-  const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
+// Algorithmic reverb via randomised impulse response
+function createReverb(ctx: AudioContext, decaySeconds: number): ConvolverNode {
+  const convolver = ctx.createConvolver();
+  const length = Math.floor(ctx.sampleRate * decaySeconds);
+  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.0);
+    }
+  }
+  convolver.buffer = impulse;
+  return convolver;
+}
 
-  const [isPlaying, setIsPlaying]       = useState(false);
-  const [mode, setModeState]            = useState<Mode>("focus");
-  const [intensity, setIntensityState]  = useState<Intensity>("medium");
-  const [volume, setVolumeState]        = useState(0.8);
-  const [elapsed, setElapsed]           = useState(0);
-  const [duration, setDurationState]    = useState(25);
+export function useAudioEngine() {
+  const ctxRef            = useRef<AudioContext | null>(null);
+  const masterGainRef     = useRef<GainNode | null>(null);
+  const leftOscRef        = useRef<OscillatorNode | null>(null);
+  const rightOscRef       = useRef<OscillatorNode | null>(null);
+  const noiseSourceRef    = useRef<AudioBufferSourceNode | null>(null);
+  const noiseGainRef      = useRef<GainNode | null>(null);
+  const isoOscRef         = useRef<OscillatorNode | null>(null);
+  const isoLfoRef         = useRef<OscillatorNode | null>(null);
+  const isoConstRef       = useRef<ConstantSourceNode | null>(null);
+  const breathLfoRef      = useRef<OscillatorNode | null>(null);
+  const padOscillatorsRef = useRef<OscillatorNode[]>([]);
+  const timerRef          = useRef<ReturnType<typeof setInterval> | null>(null);
+  const analyserRef       = useRef<AnalyserNode | null>(null);
+
+  const [isPlaying, setIsPlaying]      = useState(false);
+  const [mode, setModeState]           = useState<Mode>("focus");
+  const [intensity, setIntensityState] = useState<Intensity>("medium");
+  const [volume, setVolumeState]       = useState(0.8);
+  const [elapsed, setElapsed]          = useState(0);
+  const [duration, setDurationState]   = useState(25);
   const startTimeRef = useRef<number>(0);
 
   const getCtx = useCallback(() => {
-    if (!ctxRef.current) ctxRef.current = new AudioContext();
+    if (!ctxRef.current) {
+      ctxRef.current = new AudioContext();
+      const analyser = ctxRef.current.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
+      analyser.connect(ctxRef.current.destination);
+      analyserRef.current = analyser;
+    }
     return ctxRef.current;
   }, []);
 
@@ -133,8 +173,7 @@ export function useAudioEngine() {
       gain.gain.setTargetAtTime(0, now, FADE_DURATION / 3);
     }
 
-    // Capture current node values before nulling refs
-    const toStop = [
+    const toStop: AudioScheduledSourceNode[] = ([
       leftOscRef.current,
       rightOscRef.current,
       isoOscRef.current,
@@ -142,18 +181,20 @@ export function useAudioEngine() {
       breathLfoRef.current,
       noiseSourceRef.current,
       isoConstRef.current,
-    ];
+      ...padOscillatorsRef.current,
+    ].filter(Boolean)) as AudioScheduledSourceNode[];
 
-    leftOscRef.current     = null;
-    rightOscRef.current    = null;
-    isoOscRef.current      = null;
-    isoLfoRef.current      = null;
-    breathLfoRef.current   = null;
-    noiseSourceRef.current = null;
-    isoConstRef.current    = null;
+    leftOscRef.current        = null;
+    rightOscRef.current       = null;
+    isoOscRef.current         = null;
+    isoLfoRef.current         = null;
+    breathLfoRef.current      = null;
+    noiseSourceRef.current    = null;
+    isoConstRef.current       = null;
+    padOscillatorsRef.current = [];
 
     setTimeout(() => {
-      toStop.forEach(n => { try { (n as AudioScheduledSourceNode)?.stop(); } catch {} });
+      toStop.forEach(n => { try { n.stop(); } catch {} });
     }, FADE_DURATION * 1000);
   }, []);
 
@@ -169,35 +210,73 @@ export function useAudioEngine() {
 
     stopNodes();
 
-    // ─── Master gain (fade in) ───────────────────────────────────────
+    // ─── Master gain (fade in) ────────────────────────────────────────
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(0, ctx.currentTime);
     masterGain.gain.linearRampToValueAtTime(targetVol, ctx.currentTime + FADE_DURATION);
-    masterGain.connect(ctx.destination);
+    masterGain.connect(analyserRef.current ?? ctx.destination);
     masterGainRef.current = masterGain;
 
-    // ─── Breathing rhythm ────────────────────────────────────────────
-    // Sine LFO at 1/breathPeriod Hz → ±8% volume sway
-    // Body naturally syncs breathing to the rhythm
+    // ─── Breathing rhythm LFO ─────────────────────────────────────────
     const breathLfo = ctx.createOscillator();
     breathLfo.type = "sine";
     breathLfo.frequency.value = 1 / config.breathPeriod;
     const breathDepth = ctx.createGain();
-    breathDepth.gain.value = targetVol * 0.08;
+    breathDepth.gain.value = targetVol * 0.06;
     breathLfo.connect(breathDepth);
     breathDepth.connect(masterGain.gain);
     breathLfo.start();
     breathLfoRef.current = breathLfo;
 
-    // ─── Binaural beats (headphones) ─────────────────────────────────
+    // ─── Algorithmic reverb ───────────────────────────────────────────
+    const reverb = createReverb(ctx, config.reverbDecay);
+    const reverbOutGain = ctx.createGain();
+    reverbOutGain.gain.value = 0.42;
+    reverb.connect(reverbOutGain);
+    reverbOutGain.connect(masterGain);
+
+    // Dry bus for pad (no reverb)
+    const dryGain = ctx.createGain();
+    dryGain.gain.value = 0.58;
+    dryGain.connect(masterGain);
+
+    // ─── Ambient pad (harmonic oscillator bank) ───────────────────────
+    // Each harmonic = 2 detuned oscillators (chorus warmth)
+    const padOscillators: OscillatorNode[] = [];
+    const padBus = ctx.createGain();
+    padBus.gain.value = 0.48;
+    padBus.connect(dryGain);
+    padBus.connect(reverb);
+
+    config.harmonics.forEach((mult, harmIdx) => {
+      ([-6, 6] as number[]).forEach((detuneCents) => {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = config.carrierFreq * mult;
+        osc.detune.value = detuneCents;
+        const oscGain = ctx.createGain();
+        // Fundamental loudest, harmonics progressively softer
+        oscGain.gain.value = (1 / (harmIdx + 1)) * 0.28;
+        osc.connect(oscGain);
+        oscGain.connect(padBus);
+        osc.start();
+        padOscillators.push(osc);
+      });
+    });
+    padOscillatorsRef.current = padOscillators;
+
+    // ─── Binaural beats (headphones layer) ───────────────────────────
     const merger = ctx.createChannelMerger(2);
-    merger.connect(masterGain);
+    const binauralGain = ctx.createGain();
+    binauralGain.gain.value = 0.14;
+    merger.connect(binauralGain);
+    binauralGain.connect(masterGain);
 
     const leftOsc = ctx.createOscillator();
     leftOsc.frequency.value = config.carrierFreq;
     leftOsc.type = "sine";
     const leftGain = ctx.createGain();
-    leftGain.gain.value = 0.4;
+    leftGain.gain.value = 1.0;
     leftOsc.connect(leftGain);
     leftGain.connect(merger, 0, 0);
     leftOsc.start();
@@ -207,37 +286,35 @@ export function useAudioEngine() {
     rightOsc.frequency.value = config.carrierFreq + config.beatFreq;
     rightOsc.type = "sine";
     const rightGain = ctx.createGain();
-    rightGain.gain.value = 0.4;
+    rightGain.gain.value = 1.0;
     rightOsc.connect(rightGain);
     rightGain.connect(merger, 0, 1);
     rightOsc.start();
     rightOscRef.current = rightOsc;
 
     // ─── Isochronic tones (works without headphones) ─────────────────
-    // Carrier at solfeggio freq, amplitude gated by square LFO at beat freq
-    // Gate: ConstantSource(0.4) + LFO*0.4 → [0 .. 0.8] (off → on)
     const isoOsc = ctx.createOscillator();
     isoOsc.type = "sine";
     isoOsc.frequency.value = config.carrierFreq;
 
     const pulseGate = ctx.createGain();
-    pulseGate.gain.value = 0; // controlled by LFO + const below
+    pulseGate.gain.value = 0;
 
     const isoLfo = ctx.createOscillator();
-    isoLfo.type = "square";
+    isoLfo.type = "sine";
     isoLfo.frequency.value = config.beatFreq;
 
     const isoLfoScale = ctx.createGain();
-    isoLfoScale.gain.value = 0.4; // [-1,1] → [-0.4, 0.4]
+    isoLfoScale.gain.value = 0.4;
 
-    const isoConst = new ConstantSourceNode(ctx, { offset: 0.4 }); // shift → [0, 0.8]
+    const isoConst = new ConstantSourceNode(ctx, { offset: 0.4 });
 
     isoLfo.connect(isoLfoScale);
     isoLfoScale.connect(pulseGate.gain);
     isoConst.connect(pulseGate.gain);
 
     const isoVol = ctx.createGain();
-    isoVol.gain.value = 0.28; // quieter than binaural, blends in
+    isoVol.gain.value = 0.08;
 
     isoOsc.connect(pulseGate);
     pulseGate.connect(isoVol);
@@ -246,18 +323,25 @@ export function useAudioEngine() {
     isoLfo.start();
     isoConst.start();
     isoOsc.start();
-    isoOscRef.current  = isoOsc;
-    isoLfoRef.current  = isoLfo;
+    isoOscRef.current   = isoOsc;
+    isoLfoRef.current   = isoLfo;
     isoConstRef.current = isoConst;
 
-    // ─── Pink noise ──────────────────────────────────────────────────
+    // ─── Filtered pink noise ──────────────────────────────────────────
     const noiseBuffer = createPinkNoiseBuffer(ctx);
     const noiseSource = ctx.createBufferSource();
     noiseSource.buffer = noiseBuffer;
     noiseSource.loop = true;
+
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = "lowpass";
+    noiseFilter.frequency.value = config.noiseCutoff;
+    noiseFilter.Q.value = 0.7;
+
     const noiseGain = ctx.createGain();
     noiseGain.gain.value = config.noiseGain;
-    noiseSource.connect(noiseGain);
+    noiseSource.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
     noiseGain.connect(masterGain);
     noiseSource.start();
     noiseSourceRef.current = noiseSource;
@@ -354,5 +438,6 @@ export function useAudioEngine() {
     setIntensity,
     setVolume,
     setDuration,
+    analyserNode: analyserRef,
   };
 }

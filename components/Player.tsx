@@ -71,7 +71,7 @@ export default function Player() {
         className="w-full rounded-3xl p-4"
         style={{ backgroundColor: "#0a1628", border: "1px solid #1a3a6b" }}
       >
-        <WaveVisualizer isPlaying={audio.isPlaying} mode={audio.mode} />
+        <WaveVisualizer isPlaying={audio.isPlaying} mode={audio.mode} analyserNode={audio.analyserNode} />
 
         {/* Timer */}
         <div className="flex items-center justify-between mt-3 px-1">
