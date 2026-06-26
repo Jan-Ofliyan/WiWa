@@ -7,7 +7,7 @@ const MODES: Array<{ id: Mode; label: string; sub: string; desc: string; icon: s
   { id: "focus",      label: "Фокус",     sub: "Бета · 16 Гц",  desc: "Ясность мышления и рабочий поток",       icon: "◈", color: "#FF6B35" },
   { id: "meditation", label: "Медитация", sub: "Альфа · 10 Гц", desc: "Спокойствие без сонливости",             icon: "◎", color: "#4FC3F7" },
   { id: "sleep",      label: "Сон",       sub: "Дельта · 2 Гц", desc: "Глубокое восстановление организма",      icon: "◑", color: "#CE93D8" },
-  { id: "silence",    label: "Тишина",    sub: "Тета · 6 Гц",   desc: "Творчество, интуиция, подсознание",      icon: "◌", color: "#26C6DA" },
+  { id: "silence",    label: "Тишина",    sub: "Тета · 7.83 Гц",   desc: "Творчество, интуиция, подсознание",      icon: "◌", color: "#26C6DA" },
   { id: "gamma",      label: "Гамма",     sub: "Гамма · 40 Гц", desc: "Пиковая осознанность и поток",           icon: "✦", color: "#80DEEA" },
 ];
 

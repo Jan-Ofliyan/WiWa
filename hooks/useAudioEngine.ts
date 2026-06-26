@@ -142,15 +142,19 @@ export function useAudioEngine() {
   const isoConstRef       = useRef<ConstantSourceNode | null>(null);
   const breathLfoRef      = useRef<OscillatorNode | null>(null);
   const padOscillatorsRef = useRef<OscillatorNode[]>([]);
-  const timerRef          = useRef<ReturnType<typeof setInterval> | null>(null);
-  const analyserRef       = useRef<AnalyserNode | null>(null);
+  const timerRef              = useRef<ReturnType<typeof setInterval> | null>(null);
+  const analyserRef           = useRef<AnalyserNode | null>(null);
+  const stopRef               = useRef<() => void>(() => {});
+  const padBusRef             = useRef<GainNode | null>(null);
+  const soundscapeActiveRef   = useRef(false);
 
   const [isPlaying, setIsPlaying]      = useState(false);
+  const [isPaused, setIsPaused]        = useState(false);
   const [mode, setModeState]           = useState<Mode>("focus");
   const [intensity, setIntensityState] = useState<Intensity>("medium");
   const [volume, setVolumeState]       = useState(0.8);
   const [elapsed, setElapsed]          = useState(0);
-  const [duration, setDurationState]   = useState(25);
+  const [duration, setDurationState]   = useState(15);
   const startTimeRef = useRef<number>(0);
 
   const getCtx = useCallback(() => {
@@ -244,9 +248,10 @@ export function useAudioEngine() {
     // Each harmonic = 2 detuned oscillators (chorus warmth)
     const padOscillators: OscillatorNode[] = [];
     const padBus = ctx.createGain();
-    padBus.gain.value = 0.48;
+    padBus.gain.value = soundscapeActiveRef.current ? 0.04 : 0.48;
     padBus.connect(dryGain);
     padBus.connect(reverb);
+    padBusRef.current = padBus;
 
     config.harmonics.forEach((mult, harmIdx) => {
       ([-6, 6] as number[]).forEach((detuneCents) => {
@@ -339,7 +344,9 @@ export function useAudioEngine() {
     noiseFilter.Q.value = 0.7;
 
     const noiseGain = ctx.createGain();
-    noiseGain.gain.value = config.noiseGain;
+    noiseGain.gain.value = soundscapeActiveRef.current
+      ? config.noiseGain * 0.1
+      : config.noiseGain;
     noiseSource.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
     noiseGain.connect(masterGain);
@@ -350,38 +357,44 @@ export function useAudioEngine() {
     startTimeRef.current = Date.now();
     setElapsed(0);
     setIsPlaying(true);
+    setIsPaused(false);
 
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsed(secs);
-      if (secs >= activeDuration * 60) stop();
+      if (secs >= activeDuration * 60) stopRef.current();
     }, 1000);
   }, [mode, intensity, duration, volume, getCtx, stopNodes]);
 
   const pause = useCallback(() => {
     ctxRef.current?.suspend();
     setIsPlaying(false);
+    setIsPaused(true);
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
   const resume = useCallback(() => {
     ctxRef.current?.resume();
     setIsPlaying(true);
+    setIsPaused(false);
     startTimeRef.current = Date.now() - elapsed * 1000;
     timerRef.current = setInterval(() => {
       const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsed(secs);
-      if (secs >= duration * 60) stop();
+      if (secs >= duration * 60) stopRef.current();
     }, 1000);
   }, [elapsed, duration]);
 
   const stop = useCallback(() => {
     stopNodes();
     setIsPlaying(false);
+    setIsPaused(false);
     setElapsed(0);
     if (timerRef.current) clearInterval(timerRef.current);
   }, [stopNodes]);
+
+  stopRef.current = stop;
 
   const setMode = useCallback((m: Mode) => {
     setModeState(m);
@@ -418,10 +431,30 @@ export function useAudioEngine() {
     setDurationState(d);
   }, []);
 
+  const setAmbientActive = useCallback((active: boolean) => {
+    soundscapeActiveRef.current = active;
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    if (padBusRef.current) {
+      padBusRef.current.gain.setTargetAtTime(
+        active ? 0.04 : 0.48, ctx.currentTime, 0.5
+      );
+    }
+    if (noiseGainRef.current) {
+      noiseGainRef.current.gain.setTargetAtTime(
+        active
+          ? MODE_CONFIGS[mode].noiseGain * 0.1
+          : MODE_CONFIGS[mode].noiseGain,
+        ctx.currentTime, 0.5
+      );
+    }
+  }, [mode]);
+
   const remaining = duration * 60 - elapsed;
 
   return {
     isPlaying,
+    isPaused,
     mode,
     intensity,
     volume,
@@ -438,6 +471,7 @@ export function useAudioEngine() {
     setIntensity,
     setVolume,
     setDuration,
+    setAmbientActive,
     analyserNode: analyserRef,
   };
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAudioEngine, Intensity } from "@/hooks/useAudioEngine";
+import { useSoundscape, SOUNDSCAPES } from "@/hooks/useSoundscape";
 import ModeSelector from "./ModeSelector";
 import WaveVisualizer from "./WaveVisualizer";
 
-const DURATIONS = [15, 25, 45, 60];
+const DURATIONS = [5, 10, 15, 20, 30];
 
 const INTENSITIES: { id: Intensity; label: string }[] = [
   { id: "light", label: "Лёгкая" },
@@ -21,20 +22,23 @@ function formatTime(secs: number) {
 
 export default function Player() {
   const audio = useAudioEngine();
+  const soundscape = useSoundscape();
   const [showHeadphonesHint, setShowHeadphonesHint] = useState(false);
 
+  useEffect(() => {
+    audio.setAmbientActive(soundscape.active !== "none");
+  }, [soundscape.active]);
+
   const handlePlay = () => {
-    if (!audio.isPlaying) {
+    if (audio.isPlaying) {
+      audio.pause();
+    } else if (audio.isPaused) {
+      audio.resume();
+    } else {
       setShowHeadphonesHint(true);
       setTimeout(() => setShowHeadphonesHint(false), 4000);
       audio.start();
-    } else {
-      audio.pause();
     }
-  };
-
-  const handleStop = () => {
-    audio.stop();
   };
 
   const progressPercent = audio.duration > 0
@@ -182,10 +186,62 @@ export default function Player() {
         />
       </div>
 
+      {/* Soundscape */}
+      <div className="w-full">
+        <p className="text-xs mb-2 tracking-wider uppercase" style={{ color: "#3d6b9e" }}>
+          Атмосфера
+        </p>
+        <div className="grid grid-cols-4 gap-2">
+          {SOUNDSCAPES.map((s) => {
+            const isActive = soundscape.active === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => soundscape.setActive(isActive ? "none" : s.id)}
+                className="flex flex-col items-center gap-1 rounded-2xl py-3 transition-all duration-200 active:scale-95"
+                style={{
+                  backgroundColor: isActive ? "#378ADD22" : "#0d1f3c",
+                  border: `1px solid ${isActive ? "#378ADD" : "#1a3a6b"}`,
+                }}
+              >
+                <span className="text-xl">{s.icon}</span>
+                <span className="text-xs" style={{ color: isActive ? "#5BA3F5" : "#3d6b9e" }}>
+                  {s.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {soundscape.active !== "none" && (
+          <div className="mt-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs tracking-wider uppercase" style={{ color: "#3d6b9e" }}>
+                Громкость атмосферы
+              </span>
+              <span className="text-xs font-mono" style={{ color: "#3d6b9e" }}>
+                {Math.round(soundscape.volume * 100)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={soundscape.volume}
+              onChange={(e) => soundscape.setVolume(Number(e.target.value))}
+              className="w-full h-1 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(90deg, #378ADD ${soundscape.volume * 100}%, #1a3a6b ${soundscape.volume * 100}%)`,
+              }}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Play / Stop */}
       <div className="flex items-center justify-center mt-2">
         <button
-          onClick={audio.isPlaying ? handleStop : handlePlay}
+          onClick={handlePlay}
           className="w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 active:scale-95"
           style={{
             background: "linear-gradient(135deg, #378ADD, #5BA3F5)",
@@ -195,8 +251,9 @@ export default function Player() {
           }}
         >
           {audio.isPlaying ? (
-            <svg width="20" height="20" viewBox="0 0 14 14" fill="white">
-              <rect width="14" height="14" rx="2" />
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="white">
+              <rect x="3" y="2" width="5" height="18" rx="1.5" />
+              <rect x="14" y="2" width="5" height="18" rx="1.5" />
             </svg>
           ) : (
             <svg width="22" height="22" viewBox="0 0 22 22" fill="white" style={{ marginLeft: 3 }}>
